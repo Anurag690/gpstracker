@@ -1,3 +1,4 @@
+package com.bushireoperatorapp;
 
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -19,7 +20,7 @@ import java.net.URISyntaxException;
 
 public class TrackingService extends Service {
     private static final String TAG = "MARCIGPS";
-    private static final String URL = "http://192.168.1.27:4000/";
+    private static final String URL = "";
     private static final String TRACK_EVENT = "tracking";
     private Socket mSocket = null;
     LocationListener [] locationListeners = new LocationListener[] {
@@ -39,20 +40,6 @@ public class TrackingService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        Intent notificationIntent = new Intent(this, TrackingService.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
-
-        Notification notification = new Notification.Builder(this)
-                .setContentTitle("BushireDriverApp")
-                .setContentText("GPS is running")
-                .setSmallIcon(R.drawable.src_assets_drawablehdpi_boarding_dropping)
-                .setContentIntent(pendingIntent)
-                .setTicker("BushireDriverApp")
-                .setPriority(Notification.PRIORITY_HIGH)
-                .build();
-        startForeground(101, notification);
-
-        initializeLocationManager();
     }
 
     private void initializeLocationManager() {
@@ -98,58 +85,82 @@ public class TrackingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Toast.makeText(this, "Service Started", Toast.LENGTH_LONG).show();
-        try {
-            createSocket();
-            try{
-                locationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER,
-                        LOCATION_INTERVAL,
-                        LOCATION_DISTANCE,
-                        locationListeners[1]
-                );
-            }catch (Exception err) {
-                Log.i(TAG, err.toString());
-            }
+
+        // SharedPreferenceHandler.init(getApplicationContext());
+        // String token = SharedPreferenceHandler.getInstance().getString("bushire");
+        // if(token.trim() != "") {
+            Toast.makeText(this, "Service Started", Toast.LENGTH_LONG).show();
+            Intent notificationIntent = new Intent(this, TrackingService.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+
+            Notification notification = new Notification.Builder(this)
+                    .setContentTitle("BushireDriverApp")
+                    .setContentText("GPS is running")
+                    .setSmallIcon(R.drawable.src_assets_drawablehdpi_boarding_dropping)
+                    .setContentIntent(pendingIntent)
+                    .setTicker("BushireDriverApp")
+                    .setPriority(Notification.PRIORITY_HIGH)
+                    .build();
+            startForeground(101, notification);
+
+            initializeLocationManager();
+            
             try {
-                locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER,
-                        LOCATION_INTERVAL,
-                        LOCATION_DISTANCE,
-                        locationListeners[0]
-                );
-            }catch (Exception err) {
-                Log.i(TAG, err.toString());
+                String token = "";
+                createSocket(token);
+                try{
+                    locationManager.requestLocationUpdates(
+                            LocationManager.NETWORK_PROVIDER,
+                            LOCATION_INTERVAL,
+                            LOCATION_DISTANCE,
+                            locationListeners[1]
+                    );
+                }catch (Exception err) {
+                    Log.i(TAG, err.toString());
+                }
+                try {
+                    locationManager.requestLocationUpdates(
+                            LocationManager.GPS_PROVIDER,
+                            LOCATION_INTERVAL,
+                            LOCATION_DISTANCE,
+                            locationListeners[0]
+                    );
+                }catch (Exception err) {
+                    Log.i(TAG, err.toString());
+                }
+                mSocket.emit("connection", "conn1");
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
             }
-            mSocket.emit("connection", "conn1");
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-        
+        // }else {
+        //     Toast.makeText(getApplicationContext(), "No service to start", Toast.LENGTH_SHORT);
+        //     getApplicationContext().stopService(new Intent(getApplicationContext(), TrackingService.class));
+        // }
         return START_STICKY;
     }
 
-    public void createSocket() throws URISyntaxException {
-        String token = "";
+    public void createSocket(String token) throws URISyntaxException {
         IO.Options options = new IO.Options();
         options.query = "token="+token;
         mSocket = IO.socket(URL, options).connect();
     }
 
-    // @Override
-    // public void onDestroy() {
-    //     super.onDestroy();
-    //     Log.i(TAG, "onDestroy");
-    //     if(locationManager != null) {
-    //         for(int i = 0; i<locationListeners.length; i++) {
-    //             try {
-    //                 locationManager.removeUpdates(locationListeners[i]);
-    //             }catch (Exception e) {
-    //                 Log.i(TAG, e.toString());
-    //             }
-    //         }
-    //     }
-    //     mSocket.disconnect();
-    //     Toast.makeText(this, "Service Destroyed", Toast.LENGTH_LONG).show();
-    // }
+    @Override
+    public void onDestroy() {
+        Log.i(TAG, "onDestroy");
+        if(locationManager != null) {
+            for(int i = 0; i<locationListeners.length; i++) {
+                try {
+                    locationManager.removeUpdates(locationListeners[i]);
+                }catch (Exception e) {
+                    Log.i(TAG, e.toString());
+                }
+            }
+        }
+        mSocket.disconnect();
+        Toast.makeText(this, "Service Destroyed", Toast.LENGTH_LONG).show();
+        Intent broadcastIntent = new Intent("marci.restart.service");
+        sendBroadcast(broadcastIntent);
+        super.onDestroy();
+    }
 }
